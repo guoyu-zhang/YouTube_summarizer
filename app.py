@@ -119,7 +119,7 @@ def summarize_video():
     video_id = extract_video_id_from_url(url)
     if not video_id:
         return jsonify({'error': 'Could not extract video ID.'}), 400
-    
+
     # Get the proxy URL from environment variables
     proxy_url = os.environ.get("PROXY_URL")
 
@@ -132,12 +132,14 @@ def summarize_video():
         }
 
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, proxies=proxies)
+        
         transcript = " ".join([d['text'] for d in transcript_list])
         summary = summarize_transcript(transcript)
         return jsonify({'summary': summary})
     except Exception as e:
-        return jsonify({'error': f"Could not retrieve transcript. Error: {e}"}), 500
+        print(f"--- TRANSCRIPT API ERROR --- \n{e}\n-------------------------")
+        return jsonify({'error': "Could not retrieve video transcript. The video may not have one, or it might be private."}), 500
 
 @app.route('/save_summary', methods=['POST'])
 def save_summary():
