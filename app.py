@@ -1,5 +1,6 @@
 import os
 import re
+import requests
 import psycopg2
 import psycopg2.extras
 from flask import Flask, request, jsonify
@@ -133,7 +134,10 @@ def summarize_video():
                 proxy_username=proxy_username,
                 proxy_password=proxy_password,
             )
-            print(f"Using proxy: {proxy_config.to_requests_dict()}")
+            print("Proxy config dict:", proxy_config.to_requests_dict())
+            print("Prevent keep-alive:", proxy_config.prevent_keeping_connections_alive)
+            print("Retries when blocked:", proxy_config.retries_when_blocked)
+
 
             # Create an instance of the API with the specific config
             ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
@@ -192,6 +196,28 @@ def delete_summary(summary_id):
         return jsonify({'success': True, 'message': 'Summary deleted.'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/test-proxy')
+def test_proxy():
+    proxy_username = os.environ.get("PROXY_USERNAME")
+    proxy_password = os.environ.get("PROXY_PASSWORD")
+
+    proxy_config = WebshareProxyConfig(
+        proxy_username=proxy_username,
+        proxy_password=proxy_password,
+    )
+
+    try:
+        session = requests.Session()
+        session.headers.update({'Connection': 'close'})
+        proxies = proxy_config.to_requests_dict()
+
+        ip = session.get("https://api.ipify.org", proxies=proxies, timeout=10).text
+        return jsonify({"proxy_ip": ip})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 
 # --- Main ---
 if __name__ == '__main__':
