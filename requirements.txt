@@ -3,3 +3,5 @@ google-generativeai
 python-dotenv
 Flask
 google-api-python-client
+gunicorn
+psycopg2-binary

@@ -180,7 +180,6 @@
     </div>
 
     <script>
-      // (The top part of the script is unchanged)
       let currentData = {
         url: "",
         title: "",
@@ -299,9 +298,7 @@
           .join("");
       }
 
-      // --- NEW FUNCTION FOR DELETING ---
       async function deleteSummary(summaryId) {
-        // Ask for confirmation before deleting
         if (!confirm("Are you sure you want to delete this summary?")) {
           return;
         }
