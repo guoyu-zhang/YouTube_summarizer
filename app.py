@@ -119,6 +119,17 @@ def summarize_video():
     video_id = extract_video_id_from_url(url)
     if not video_id:
         return jsonify({'error': 'Could not extract video ID.'}), 400
+    
+    # Get the proxy URL from environment variables
+    proxy_url = os.environ.get("PROXY_URL")
+
+    # Set up the proxies dictionary for the library
+    proxies = None
+    if proxy_url:
+        proxies = {
+            "http": proxy_url,
+            "https": proxy_url,
+        }
 
     try:
         transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
