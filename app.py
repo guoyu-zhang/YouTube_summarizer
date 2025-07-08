@@ -4,6 +4,7 @@ import psycopg2
 import psycopg2.extras
 from flask import Flask, request, jsonify
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
 import google.generativeai as genai
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
@@ -120,27 +121,31 @@ def summarize_video():
     if not video_id:
         return jsonify({'error': 'Could not extract video ID.'}), 400
 
-    # Get the proxy URL from environment variables
-    proxy_url = os.environ.get("PROXY_URL")
-
-    # Set up the proxies dictionary for the library
-    proxies = None
-    if proxy_url:
-        proxies = {
-            "http": proxy_url,
-            "https": proxy_url,
-        }
+    # Get proxy credentials from environment variables
+    proxy_username = os.environ.get("PROXY_USERNAME")
+    proxy_password = os.environ.get("PROXY_PASSWORD")
 
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, proxies=proxies)
-        
+        # Check if credentials are provided and initialize the API with the proxy config
+        if proxy_username and proxy_password:
+            proxy_config = WebshareProxyConfig(
+                proxy_username=proxy_username,
+                proxy_password=proxy_password,
+            )
+            # Create an instance of the API with the specific config
+            ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
+            transcript_list = ytt_api.get_transcript(video_id)
+        else:
+            # Fallback to a direct request if no proxy is configured
+            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+
         transcript = " ".join([d['text'] for d in transcript_list])
         summary = summarize_transcript(transcript)
         return jsonify({'summary': summary})
     except Exception as e:
         print(f"--- TRANSCRIPT API ERROR --- \n{e}\n-------------------------")
         return jsonify({'error': "Could not retrieve video transcript. The video may not have one, or it might be private."}), 500
-
+    
 @app.route('/save_summary', methods=['POST'])
 def save_summary():
     """Saves a generated summary to the PostgreSQL database."""
