@@ -128,6 +128,7 @@ def summarize_video():
     try:
         # Check if credentials are provided and initialize the API with the proxy config
         if proxy_username and proxy_password:
+            print("hellolololol")
             proxy_config = WebshareProxyConfig(
                 proxy_username=proxy_username,
                 proxy_password=proxy_password,
@@ -136,6 +137,7 @@ def summarize_video():
             ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
             transcript_list = ytt_api.get_transcript(video_id)
         else:
+            print("BYEYEYE")
             # Fallback to a direct request if no proxy is configured
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
 
