@@ -82,6 +82,48 @@ def summarize_transcript(transcript):
     except Exception as e:
         return f"An error occurred during summarization: {e}"
 
+def get_transcript_with_proxy(video_id):
+    """Attempts to get transcript using proxy configuration."""
+    proxy_username = os.environ.get("PROXY_USERNAME")
+    proxy_password = os.environ.get("PROXY_PASSWORD")
+    
+    if not proxy_username or not proxy_password:
+        print("No proxy credentials found, trying direct connection...")
+        return YouTubeTranscriptApi.get_transcript(video_id)
+    
+    try:
+        print(f"Attempting to get transcript for video {video_id} using proxy...")
+        
+        # Create proxy configuration
+        proxy_config = WebshareProxyConfig(
+            proxy_username=proxy_username,
+            proxy_password=proxy_password,
+        )
+        
+        # Debug proxy configuration
+        print(f"Proxy config created successfully")
+        print(f"Proxy dict: {proxy_config.to_requests_dict()}")
+        
+        # Get transcript with proxy
+        transcript_list = YouTubeTranscriptApi.get_transcript(
+            video_id, 
+            proxies=proxy_config.to_requests_dict()
+        )
+        
+        print(f"Successfully retrieved transcript with proxy")
+        return transcript_list
+        
+    except Exception as proxy_error:
+        print(f"Proxy request failed: {proxy_error}")
+        print("Attempting direct connection as fallback...")
+        
+        # Fallback to direct connection
+        try:
+            return YouTubeTranscriptApi.get_transcript(video_id)
+        except Exception as direct_error:
+            print(f"Direct connection also failed: {direct_error}")
+            raise direct_error
+
 # --- Flask Routes ---
 @app.route('/')
 def index():
@@ -122,37 +164,25 @@ def summarize_video():
     if not video_id:
         return jsonify({'error': 'Could not extract video ID.'}), 400
 
-    # Get proxy credentials from environment variables
-    proxy_username = os.environ.get("PROXY_USERNAME")
-    proxy_password = os.environ.get("PROXY_PASSWORD")
-
     try:
-        # Check if credentials are provided and initialize the API with the proxy config
-        if proxy_username and proxy_password:
-            print("hellolololol")
-            proxy_config = WebshareProxyConfig(
-                proxy_username=proxy_username,
-                proxy_password=proxy_password,
-            )
-            print("Proxy config dict:", proxy_config.to_requests_dict())
-            print("Prevent keep-alive:", proxy_config.prevent_keeping_connections_alive)
-            print("Retries when blocked:", proxy_config.retries_when_blocked)
-
-
-            # Create an instance of the API with the specific config
-            ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
-            transcript_list = ytt_api.get_transcript(video_id)
-        else:
-            print("BYEYEYE")
-            # Fallback to a direct request if no proxy is configured
-            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-
+        # Use the improved proxy function
+        transcript_list = get_transcript_with_proxy(video_id)
+        
         transcript = " ".join([d['text'] for d in transcript_list])
         summary = summarize_transcript(transcript)
         return jsonify({'summary': summary})
+        
     except Exception as e:
         print(f"--- TRANSCRIPT API ERROR --- \n{e}\n-------------------------")
-        return jsonify({'error': "Could not retrieve video transcript. The video may not have one, or it might be private."}), 500
+        error_message = str(e)
+        
+        # Provide more specific error messages
+        if "blocked" in error_message.lower() or "cloud provider" in error_message.lower():
+            return jsonify({'error': "YouTube has blocked this request. Please ensure your proxy is configured correctly."}), 500
+        elif "transcript" in error_message.lower():
+            return jsonify({'error': "Could not retrieve video transcript. The video may not have one, or it might be private."}), 500
+        else:
+            return jsonify({'error': f"An error occurred while processing the video: {error_message}"}), 500
     
 @app.route('/save_summary', methods=['POST'])
 def save_summary():
@@ -197,27 +227,40 @@ def delete_summary(summary_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 @app.route('/test-proxy')
 def test_proxy():
+    """Test endpoint to verify proxy functionality."""
     proxy_username = os.environ.get("PROXY_USERNAME")
     proxy_password = os.environ.get("PROXY_PASSWORD")
 
-    proxy_config = WebshareProxyConfig(
-        proxy_username=proxy_username,
-        proxy_password=proxy_password,
-    )
+    if not proxy_username or not proxy_password:
+        return jsonify({"error": "Proxy credentials not configured"})
 
     try:
+        proxy_config = WebshareProxyConfig(
+            proxy_username=proxy_username,
+            proxy_password=proxy_password,
+        )
+
         session = requests.Session()
         session.headers.update({'Connection': 'close'})
         proxies = proxy_config.to_requests_dict()
 
-        ip = session.get("https://api.ipify.org", proxies=proxies, timeout=10).text
-        return jsonify({"proxy_ip": ip})
+        # Test the proxy by getting IP
+        ip_response = session.get("https://api.ipify.org", proxies=proxies, timeout=10)
+        proxy_ip = ip_response.text
+        
+        # Test if we can access YouTube through the proxy
+        youtube_test = session.get("https://www.youtube.com", proxies=proxies, timeout=10)
+        
+        return jsonify({
+            "proxy_ip": proxy_ip,
+            "youtube_accessible": youtube_test.status_code == 200,
+            "status": "success"
+        })
+        
     except Exception as e:
-        return jsonify({"error": str(e)})
-
+        return jsonify({"error": str(e), "status": "failed"})
 
 # --- Main ---
 if __name__ == '__main__':
