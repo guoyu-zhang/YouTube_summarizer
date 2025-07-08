@@ -133,6 +133,8 @@ def summarize_video():
                 proxy_username=proxy_username,
                 proxy_password=proxy_password,
             )
+            print(f"Using proxy: {proxy_config.to_requests_dict()}")
+
             # Create an instance of the API with the specific config
             ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
             transcript_list = ytt_api.get_transcript(video_id)
