@@ -261,6 +261,12 @@ def test_proxy():
         
     except Exception as e:
         return jsonify({"error": str(e), "status": "failed"})
+    
+@app.route('/init_db')
+def init_db_route():
+    init_db()
+    return "Database initialized!"
+
 
 # --- Main ---
 if __name__ == '__main__':
