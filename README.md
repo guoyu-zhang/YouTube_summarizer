@@ -41,7 +41,7 @@ pip install -r requirements.txt
 
 3. **Set environement variables**
 
-Create a .env in the root with the following.
+Create a .env in the root with the following. This tool uses Webshare rotational proxies.
 
 ```bash
 GOOGLE_API_KEY=your_gemini_api_key
